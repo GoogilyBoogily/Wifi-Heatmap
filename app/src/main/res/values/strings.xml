@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Wifi Heatmap</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="stop_location_updates_button">Stop periodic location updates</string>
+    <string name="start_location_updates_button">Start periodic location updates</string>
+</resources>
