@@ -75,6 +75,35 @@
         android:textAppearance="?android:attr/textAppearanceMedium"
         android:text="Last Update Time: "
         android:id="@+id/textViewLastUpdateTime"
+        android:layout_below="@+id/textViewLocationAccuracy"
+        android:layout_centerHorizontal="true"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="Location Accuracy: "
+        android:id="@+id/textViewLocationAccuracy"
         android:layout_below="@+id/textViewLongitude"
         android:layout_centerHorizontal="true"/>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Start timer"
+        android:id="@+id/buttonTimerToggle"
+        android:layout_below="@+id/textViewLastUpdateTime"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="32dp"/>
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:inputType="time"
+        android:ems="10"
+        android:id="@+id/editTextInterval"
+        android:layout_below="@+id/buttonTimerToggle"
+        android:layout_centerHorizontal="true"
+        android:hint="Enter a time interval..."/>
+
 </RelativeLayout>

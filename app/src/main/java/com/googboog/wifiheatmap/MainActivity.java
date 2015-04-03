@@ -6,11 +6,13 @@ import android.location.Location;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,7 +32,8 @@ import java.text.DateFormat;
 import java.util.Date;
 
 
-public class MainActivity extends Activity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+public class MainActivity extends Activity
+		implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 	// Logcat tag
 	private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -38,18 +41,20 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 	private GoogleApiClient mGoogleApiClient;
 	private Location mLastLocation;
 	private Location mCurrentLocation;
+	private LocationRequest mLocationRequest;
 
 	private String mLastUpdateTime;
-
-	private LocationRequest mLocationRequest;
 
 	private boolean mRequestingLocationUpdates = false;
 
 	private final static int PLAY_SERVICES_RESOLUTION_REQUEST = 1000;
 	// Location updates intervals in sec
-	private static int UPDATE_INTERVAL = 10000; // 10 sec
-	private static int FASTEST_INTERVAL = 5000; // 5 sec
+	private static int UPDATE_INTERVAL = 3000; // 3 sec
+	private static int FASTEST_INTERVAL = 1000; // 1 sec
 	private static int DISPLACEMENT = 10; // 10 meters
+
+	// Wifi scan delay (i.e., wait $delay between completion of scan and start of next scan)
+	static final long WIFI_SCAN_DELAY_MILLIS = 2000;
 
 	int wifiStrength;
 	String wifiSSID;
@@ -66,10 +71,13 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 	private TextView latitudeTextView;
 	private TextView longitudeTextView;
 	private TextView lastUpdateTimeTextView;
+	private TextView locationAccuracyTextView;
 
-	public void showToast(String message) {
-		Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
-	} // end showToast()
+	private Button timerToggleButton;
+	private EditText intervalEditText;
+
+	private boolean timerRunning = false;
+	private long timerInterval = 1000;
 
 
 	@Override
@@ -78,16 +86,7 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 		setContentView(R.layout.activity_main);
 
 		// Setting the UI vars
-		startLocationUpdatesButton = (Button) findViewById(R.id.buttonLocationUpdates);
-		getDataPointButton = (Button) findViewById(R.id.buttonGetData);
-
-		wifiSSIDTextView = (TextView) findViewById(R.id.textViewWifiSSID);
-		wifiStrengthTextView = (TextView) findViewById(R.id.textViewWifiStrength);
-		wifiSpeedTextView = (TextView) findViewById(R.id.textViewWifiSpeed);
-
-		latitudeTextView = (TextView) findViewById(R.id.textViewLatitude);
-		longitudeTextView = (TextView) findViewById(R.id.textViewLongitude);
-		lastUpdateTimeTextView = (TextView) findViewById(R.id.textViewLastUpdateTime);
+		assignUIElements();
 
 		//updateValuesFromBundle(savedInstanceState);
 
@@ -97,8 +96,59 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 			buildGoogleApiClient();
 		} // end if
 
-		createLocationRequest();
+	} // end onCreate()
 
+	public void showToast(String message) {
+		Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
+	} // end showToast()
+
+	// Runs without a timer by reposting this handler at the end of the runnable
+	Handler timerHandler = new Handler();
+	Runnable timerRunnable = new Runnable() {
+		@Override
+		public void run() {
+
+
+			timerHandler.postDelayed(this, timerInterval);
+		} // end run()
+	};
+
+
+
+	private void assignUIElements() {
+		startLocationUpdatesButton = (Button) findViewById(R.id.buttonLocationUpdates);
+		getDataPointButton = (Button) findViewById(R.id.buttonGetData);
+
+		wifiSSIDTextView = (TextView) findViewById(R.id.textViewWifiSSID);
+		wifiStrengthTextView = (TextView) findViewById(R.id.textViewWifiStrength);
+		wifiSpeedTextView = (TextView) findViewById(R.id.textViewWifiSpeed);
+
+		latitudeTextView = (TextView) findViewById(R.id.textViewLatitude);
+		longitudeTextView = (TextView) findViewById(R.id.textViewLongitude);
+		locationAccuracyTextView = (TextView) findViewById(R.id.textViewLocationAccuracy);
+		lastUpdateTimeTextView = (TextView) findViewById(R.id.textViewLastUpdateTime);
+
+		timerToggleButton = (Button) findViewById(R.id.buttonTimerToggle);
+		intervalEditText = (EditText) findViewById(R.id.editTextInterval);
+
+		timerToggleButton.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				if(timerRunning) {
+					timerHandler.removeCallbacks(timerRunnable);
+
+					timerRunning = false;
+					timerToggleButton.setText("Start Timer");
+				} else {
+					// Set the interval to the value the user entered
+					timerInterval = Long.parseLong(intervalEditText.getText().toString());
+					timerHandler.postDelayed(timerRunnable, 0);
+
+					timerRunning = true;
+					timerToggleButton.setText("Stop Timer");
+				} // end else/if
+			} // end onClick()
+		});
 
 		// Toggling the periodic location updates
 		startLocationUpdatesButton.setOnClickListener(new View.OnClickListener() {
@@ -134,9 +184,16 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 				writeDataToSDCard();
 			} // end onClick()
 		});
+	} // end assignUIElements()
 
+	private void updateUI() {
+		latitudeTextView.setText(String.valueOf("Latitude: " + mCurrentLocation.getLatitude()));
+		longitudeTextView.setText(String.valueOf("Longitude: " + mCurrentLocation.getLongitude()));
+		locationAccuracyTextView.setText("Location Accuracy: " + mCurrentLocation.getAccuracy() + "m");
+		lastUpdateTimeTextView.setText("Last Update Time: " + mLastUpdateTime);
 
-	} // end onCreate()
+		//showToast("updateUI() fired");
+	} // end updateUI()
 
 	@Override
 	protected void onStart() {
@@ -159,8 +216,21 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 		if(mGoogleApiClient.isConnected() && mRequestingLocationUpdates) {
 			startLocationUpdates();
 		} // end if
-
 	} // end onResume()
+
+	@Override
+	protected void onStop() {
+		super.onStop();
+
+		disconnectGoogleApiClient();
+	} // end onStop()
+
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+
+		disconnectGoogleApiClient();
+	} // end onDestroy()
 
 	/*
 	public void onSaveInstanceState(Bundle savedInstanceState) {
@@ -293,12 +363,20 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 	 */
 	protected void createLocationRequest() {
 		mLocationRequest = new LocationRequest();
+
+		// Sets the desired interval for active location updates. This interval is
+		// inexact. You may not receive updates at all if no location sources are available, or
+		// you may receive them slower than requested. You may also receive updates faster than
+		// requested if other applications are requesting location at a faster interval.
 		mLocationRequest.setInterval(UPDATE_INTERVAL);
+
+		// Sets the fastest rate for active location updates. This interval is exact, and your
+		// application will never receive updates faster than this value.
 		mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
 		mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-		mLocationRequest.setSmallestDisplacement(DISPLACEMENT);
+		//mLocationRequest.setSmallestDisplacement(DISPLACEMENT);
 
-		showToast("Created location request");
+		//showToast("Created location request");
 	} // end createLocationRequest()
 
 	/**
@@ -306,7 +384,7 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 	 */
 	protected void startLocationUpdates() {
 		LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-		showToast("Started location updates");
+		//showToast("Started location updates");
 	} // end startLocationUpdates()
 
 	/**
@@ -314,7 +392,7 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 	 */
 	protected void stopLocationUpdates() {
 		LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
-		showToast("Stopped location updates");
+		//showToast("Stopped location updates");
 	} // end stopLocationUpdates()
 
 	/**
@@ -351,22 +429,26 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 		mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
 		updateUI();
 
-		showToast("onLocationChanged() fired");
+		//showToast("onLocationChanged() fired");
 	} // end onLocationChanged()
 
-	private void updateUI() {
-		latitudeTextView.setText(String.valueOf("Latitude: " + mCurrentLocation.getLatitude()));
-		longitudeTextView.setText(String.valueOf("Longitude:" + mCurrentLocation.getLongitude()));
-		lastUpdateTimeTextView.setText("Last Update Time: " + mLastUpdateTime);
-
-		//showToast("updateUI() fired");
-	} // end updateUI()
-
 	protected synchronized void buildGoogleApiClient() {
-		mGoogleApiClient = new GoogleApiClient.Builder(this).addConnectionCallbacks(this).addOnConnectionFailedListener(this).addApi(LocationServices.API).build();
+		mGoogleApiClient = new GoogleApiClient.Builder(this)
+				.addConnectionCallbacks(this)
+				.addOnConnectionFailedListener(this)
+				.addApi(LocationServices.API)
+				.build();
 
-		showToast("Built Google API Client!");
+		createLocationRequest();
+
+		//showToast("Built Google API Client!");
 	} // end buildGoogleApiClient()
+
+	private void disconnectGoogleApiClient() {
+		if(mGoogleApiClient.isConnected()) {
+			mGoogleApiClient.disconnect();
+		} // end if
+	} // end disconnectGoogleApiClient()
 
 	public void getLastKnownLocation() {
 		mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
@@ -386,7 +468,7 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 			startLocationUpdates();
 		} // end if
 
-		showToast("Connected to location services");
+		//showToast("Connected to location services");
 	} // end onConnected()
 
 	@Override
