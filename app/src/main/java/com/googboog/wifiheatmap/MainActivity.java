@@ -2,6 +2,7 @@ package com.googboog.wifiheatmap;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.IntentFilter;
 import android.location.Location;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
@@ -35,15 +36,15 @@ import java.util.Date;
 public class MainActivity extends Activity
 		implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 	// Logcat tag
-	private static final String TAG = MainActivity.class.getSimpleName();
+	protected static final String TAG = MainActivity.class.getSimpleName();
 
 
 	private GoogleApiClient mGoogleApiClient;
 	private Location mLastLocation;
-	private Location mCurrentLocation;
+	protected Location mCurrentLocation;
 	private LocationRequest mLocationRequest;
 
-	private String mLastUpdateTime;
+	protected String mLastUpdateTime;
 
 	private boolean mRequestingLocationUpdates = false;
 
@@ -76,8 +77,17 @@ public class MainActivity extends Activity
 	private Button timerToggleButton;
 	private EditText intervalEditText;
 
+	// Timer stuff
 	private boolean timerRunning = false;
 	private long timerInterval = 1000;
+
+	// Wifi scanner stuff
+	static WifiManager wifiManager;
+	private static IntentFilter wifiIntentFilter;
+	private static WifiBroadcastReceiver wifiBroadcastReceiver;
+
+	String wifiListString;
+	Date lastWifiScanTime;
 
 
 	@Override
@@ -96,11 +106,25 @@ public class MainActivity extends Activity
 			buildGoogleApiClient();
 		} // end if
 
+		initWifiScan();
+		//wifiManager.startScan();
 	} // end onCreate()
 
 	public void showToast(String message) {
 		Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
 	} // end showToast()
+
+
+	private void initWifiScan() {
+		wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+		wifiBroadcastReceiver = new WifiBroadcastReceiver(this);
+		wifiIntentFilter = new IntentFilter();
+		wifiIntentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
+		this.registerReceiver(wifiBroadcastReceiver, wifiIntentFilter);
+
+		showToast("Registered WifiBroadcastReceiver");
+	} // end initWifiScan()
+
 
 	// Runs without a timer by reposting this handler at the end of the runnable
 	Handler timerHandler = new Handler();
@@ -112,8 +136,6 @@ public class MainActivity extends Activity
 			timerHandler.postDelayed(this, timerInterval);
 		} // end run()
 	};
-
-
 
 	private void assignUIElements() {
 		startLocationUpdatesButton = (Button) findViewById(R.id.buttonLocationUpdates);
@@ -186,7 +208,7 @@ public class MainActivity extends Activity
 		});
 	} // end assignUIElements()
 
-	private void updateUI() {
+	protected void updateUI() {
 		latitudeTextView.setText(String.valueOf("Latitude: " + mCurrentLocation.getLatitude()));
 		longitudeTextView.setText(String.valueOf("Longitude: " + mCurrentLocation.getLongitude()));
 		locationAccuracyTextView.setText("Location Accuracy: " + mCurrentLocation.getAccuracy() + "m");
