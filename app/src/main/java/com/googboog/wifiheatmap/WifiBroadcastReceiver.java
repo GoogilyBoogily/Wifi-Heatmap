@@ -7,11 +7,12 @@ import android.net.wifi.ScanResult;
 import android.os.Build;
 import android.util.Log;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Timer;
+import java.util.TimerTask;
 
 /*
  * Receives Wifi scan result whenever WifiManager has them,
@@ -43,29 +44,47 @@ class WifiBroadcastReceiver extends BroadcastReceiver {
 		List<ScanResult> scanResultList = MainActivity.wifiManager.getScanResults();
 		m.lastWifiScanTime = new Date();
 
-		Collections.sort(scanResultList, RSSI_ORDER);
+		//Collections.sort(scanResultList, RSSI_ORDER);
 
-		String combined = "";
+		// Create and begin populating a new data fingerprint
+		DataFingerprint fingerprint = new DataFingerprint();
+		fingerprint.setLatitude(m.mCurrentLocation.getLatitude());
+		fingerprint.setLongitude(m.mCurrentLocation.getLongitude());
+		fingerprint.setAltitude(m.mCurrentLocation.getAltitude());
+		fingerprint.setAccuracy(m.mCurrentLocation.getAccuracy());
+		fingerprint.setTimestamp(m.mLastUpdateTime);
 
+		ArrayList<WifiFingerprint> detectedWifis = new ArrayList<>();
 		for(ScanResult wifi : scanResultList) {
-			combined += convertFrequencyToChannel(wifi.frequency) + " " + wifi.SSID + " [" + wifi.BSSID + "]" + ": " + wifi.level + "\n";
+			// Create and populate the wifi result
+			WifiFingerprint wifiResult = new WifiFingerprint();
+			wifiResult.setSSID(wifi.SSID);
+			wifiResult.setBSSID(wifi.BSSID);
+			wifiResult.setFrequency(wifi.frequency);
+			wifiResult.setLevel(wifi.level);
+
+			// Add the wifi to the list of all detected wifis
+			detectedWifis.add(wifiResult);
 
 			log(wifi, NOT_SPECIAL);
 		} // end for
 
+		fingerprint.setDetectedWifis(detectedWifis);
 
-		m.wifiListString = combined;
+
+		m.writeDataToSDCard(fingerprint);
+
 		//m.updateUI();
 
 		// Schedule next scan after short delay
-		/*
+
 		wifiScanTimer.schedule(new TimerTask() {
 			@Override
 			public void run() {
 				MainActivity.wifiManager.startScan();
 			}
 		}, MainActivity.WIFI_SCAN_DELAY_MILLIS);
-		*/
+
 	} // end onReceive()
 
 	private static int convertFrequencyToChannel(int freq) {

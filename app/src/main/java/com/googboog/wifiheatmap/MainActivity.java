@@ -17,6 +17,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -24,11 +25,7 @@ import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.File;
-import java.io.FileOutputStream;
 import java.text.DateFormat;
 import java.util.Date;
 
@@ -54,7 +51,7 @@ public class MainActivity extends Activity
 	private static int FASTEST_INTERVAL = 1000; // 1 sec
 	private static int DISPLACEMENT = 10; // 10 meters
 
-	// Wifi scan delay (i.e., wait $delay between completion of scan and start of next scan)
+	// Wifi scan delay (i.e., wait delay between completion of scan and start of next scan)
 	static final long WIFI_SCAN_DELAY_MILLIS = 2000;
 
 	int wifiStrength;
@@ -86,8 +83,10 @@ public class MainActivity extends Activity
 	private static IntentFilter wifiIntentFilter;
 	private static WifiBroadcastReceiver wifiBroadcastReceiver;
 
-	String wifiListString;
 	Date lastWifiScanTime;
+
+	// Bool for if we're currently scanning
+	boolean currentlyScanning = false;
 
 
 	@Override
@@ -156,7 +155,8 @@ public class MainActivity extends Activity
 		timerToggleButton.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				if(timerRunning) {
+				/*
+				if (timerRunning) {
 					timerHandler.removeCallbacks(timerRunnable);
 
 					timerRunning = false;
@@ -169,6 +169,20 @@ public class MainActivity extends Activity
 					timerRunning = true;
 					timerToggleButton.setText("Stop Timer");
 				} // end else/if
+
+				*/
+				if(!currentlyScanning) {
+					currentlyScanning = true;
+					wifiManager.startScan();
+
+					timerToggleButton.setText("Stop Timer");
+				} else {
+					currentlyScanning = false;
+
+					timerToggleButton.setText("Start Timer");
+				} // end else/if
+
+
 			} // end onClick()
 		});
 
@@ -203,7 +217,7 @@ public class MainActivity extends Activity
 				getLastKnownLocation();
 
 				// Write the collected data to JSON file on SD card
-				writeDataToSDCard();
+				//writeDataToSDCard();
 			} // end onClick()
 		});
 	} // end assignUIElements()
@@ -321,43 +335,54 @@ public class MainActivity extends Activity
 		return false;
 	} // end isExternalStorageWritable()
 
-	public void writeDataToSDCard() {
-		// Create new JSON object and populate it with the data
-		JSONObject dataToWrite = new JSONObject();
-		try {
-			dataToWrite.put("WiFi_SSID", wifiSSID);
-			dataToWrite.put("WiFi_Strength", wifiStrength);
-			dataToWrite.put("WiFi_Speed", wifiSpeed);
-			dataToWrite.put("Latitude", mLastLocation.getLatitude());
-			dataToWrite.put("Longitude", mLastLocation.getLongitude());
-			dataToWrite.put("Altitude", mLastLocation.getAltitude());
-		} catch (JSONException e) {
-			e.printStackTrace();
-		} // end try/catch
-
-
+	public void writeDataToSDCard(DataFingerprint fingerprint) {
 		// If we can write to the SD card, then do it
 		if (isExternalStorageWritable()) {
+			// Get SD card path
 			File sdCard = Environment.getExternalStorageDirectory();
+			// Grab the app directory
 			File dir = new File(sdCard.getAbsolutePath() + "/WiFiHeatMap/DataPoints");
+
 			// Make the dirs, if we have to
 			dir.mkdirs();
+
 			// Get a list of the files in the current dir
 			File files[] = dir.listFiles();
 
-			// Make a new JSON file with the SSID plus the number of files there are as the name
-			File file = new File(dir, wifiSSID + String.valueOf(files.length) + ".json");
+			// Figure out what to name the new file based on the number of data points we have so far
+			String dataPointName = String.valueOf(files.length) + ".json";
 
+			// Create the new file object
+			File wiFile = new File(dir, dataPointName);
+
+
+			// Create the JSON file object mapper
+			ObjectMapper mapper = new ObjectMapper();
+
+			// Write to disk
 			try {
-				FileOutputStream f = new FileOutputStream(file);
-				f.write(dataToWrite.toString().getBytes());
-
-				showToast("Wrote \"" + file.getName() + "\"");
-			} catch (Exception e) {
+				mapper.writeValue(wiFile, fingerprint);
+			} catch(Exception e) {
+				// Catch exception
 				e.printStackTrace();
 			} // end try/catch
+
+			showToast("Wrote to " + wiFile.getName());
 		} // end if
 	} // end writeDataToSDCard()
+
+	/*
+	public static <T> T fromJSON(final File json, final TypeReference<T> type) {
+		T data = null;
+
+		try {
+			data = new ObjectMapper().readValue(json, type);
+		} catch (Exception e) {
+			// Handle the problem
+		}
+		return data;
+	}
+	*/
 
 	/**
 	 * Method to verify google play services on the device
