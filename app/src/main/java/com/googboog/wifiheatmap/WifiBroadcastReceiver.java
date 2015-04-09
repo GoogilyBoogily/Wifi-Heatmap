@@ -46,45 +46,49 @@ class WifiBroadcastReceiver extends BroadcastReceiver {
 
 		//Collections.sort(scanResultList, RSSI_ORDER);
 
-		// Create and begin populating a new data fingerprint
-		DataFingerprint fingerprint = new DataFingerprint();
-		fingerprint.setLatitude(m.mCurrentLocation.getLatitude());
-		fingerprint.setLongitude(m.mCurrentLocation.getLongitude());
-		fingerprint.setAltitude(m.mCurrentLocation.getAltitude());
-		fingerprint.setAccuracy(m.mCurrentLocation.getAccuracy());
-		fingerprint.setTimestamp(m.mLastUpdateTime);
 
-		ArrayList<WifiFingerprint> detectedWifis = new ArrayList<>();
-		for(ScanResult wifi : scanResultList) {
-			// Create and populate the wifi result
-			WifiFingerprint wifiResult = new WifiFingerprint();
-			wifiResult.setSSID(wifi.SSID);
-			wifiResult.setBSSID(wifi.BSSID);
-			wifiResult.setFrequency(wifi.frequency);
-			wifiResult.setLevel(wifi.level);
-
-			// Add the wifi to the list of all detected wifis
-			detectedWifis.add(wifiResult);
-
-			log(wifi, NOT_SPECIAL);
-		} // end for
-
-		fingerprint.setDetectedWifis(detectedWifis);
-
-
-		m.writeDataToSDCard(fingerprint);
 
 		//m.updateUI();
 
 		// Schedule next scan after short delay
 
-		wifiScanTimer.schedule(new TimerTask() {
-			@Override
-			public void run() {
-				MainActivity.wifiManager.startScan();
-			}
-		}, MainActivity.WIFI_SCAN_DELAY_MILLIS);
+		// Only schedule a new scan if we're currently scanning
+		if(m.currentlyScanning) {
+			// Create and begin populating a new data fingerprint
+			DataFingerprint fingerprint = new DataFingerprint();
+			fingerprint.setLatitude(m.mCurrentLocation.getLatitude());
+			fingerprint.setLongitude(m.mCurrentLocation.getLongitude());
+			fingerprint.setAltitude(m.mCurrentLocation.getAltitude());
+			fingerprint.setAccuracy(m.mCurrentLocation.getAccuracy());
+			fingerprint.setTimestamp(m.mLastUpdateTime);
 
+			ArrayList<WifiFingerprint> detectedWifis = new ArrayList<>();
+			for (ScanResult wifi : scanResultList) {
+				// Create and populate the wifi result
+				WifiFingerprint wifiResult = new WifiFingerprint();
+				wifiResult.setSSID(wifi.SSID);
+				wifiResult.setBSSID(wifi.BSSID);
+				wifiResult.setFrequency(wifi.frequency);
+				wifiResult.setLevel(wifi.level);
+
+				// Add the wifi to the list of all detected wifis
+				detectedWifis.add(wifiResult);
+
+				log(wifi, NOT_SPECIAL);
+			} // end for
+
+			fingerprint.setDetectedWifis(detectedWifis);
+
+
+			m.writeDataToSDCard(fingerprint);
+
+			wifiScanTimer.schedule(new TimerTask() {
+				@Override
+				public void run() {
+					MainActivity.wifiManager.startScan();
+				}
+			}, MainActivity.WIFI_SCAN_DELAY_MILLIS);
+		} // end if
 	} // end onReceive()
 
 	private static int convertFrequencyToChannel(int freq) {

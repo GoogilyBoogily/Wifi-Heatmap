@@ -47,7 +47,7 @@ public class MainActivity extends Activity
 
 	private final static int PLAY_SERVICES_RESOLUTION_REQUEST = 1000;
 	// Location updates intervals in sec
-	private static int UPDATE_INTERVAL = 3000; // 3 sec
+	private static int UPDATE_INTERVAL = 2000; // 2 sec
 	private static int FASTEST_INTERVAL = 1000; // 1 sec
 	private static int DISPLACEMENT = 10; // 10 meters
 
@@ -105,8 +105,6 @@ public class MainActivity extends Activity
 			buildGoogleApiClient();
 		} // end if
 
-		initWifiScan();
-		//wifiManager.startScan();
 	} // end onCreate()
 
 	public void showToast(String message) {
@@ -516,6 +514,9 @@ public class MainActivity extends Activity
 		} // end if
 
 		//showToast("Connected to location services");
+
+		// Connect to Wifi broadcast receiver
+		initWifiScan();
 	} // end onConnected()
 
 	@Override
