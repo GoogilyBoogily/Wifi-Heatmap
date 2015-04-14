@@ -47,9 +47,6 @@ class WifiBroadcastReceiver extends BroadcastReceiver {
 		//Collections.sort(scanResultList, RSSI_ORDER);
 
 
-
-		//m.updateUI();
-
 		// Schedule next scan after short delay
 
 		// Only schedule a new scan if we're currently scanning

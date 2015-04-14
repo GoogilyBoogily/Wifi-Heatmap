@@ -1,20 +1,18 @@
 package com.googboog.wifiheatmap;
 
-import android.app.Activity;
+import android.app.Fragment;
 import android.content.Context;
 import android.content.IntentFilter;
 import android.location.Location;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v7.app.ActionBarActivity;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,8 +28,11 @@ import java.text.DateFormat;
 import java.util.Date;
 
 
-public class MainActivity extends Activity
-		implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+public class MainActivity
+		extends ActionBarActivity
+		implements NavigationDrawerCallbacks, ScannerFragment.OnScannerSelectedListener, MapFragment.OnMapSelectedListener,
+		GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+
 	// Logcat tag
 	protected static final String TAG = MainActivity.class.getSimpleName();
 
@@ -43,7 +44,7 @@ public class MainActivity extends Activity
 
 	protected String mLastUpdateTime;
 
-	private boolean mRequestingLocationUpdates = false;
+	protected boolean mRequestingLocationUpdates = false;
 
 	private final static int PLAY_SERVICES_RESOLUTION_REQUEST = 1000;
 	// Location updates intervals in sec
@@ -57,22 +58,6 @@ public class MainActivity extends Activity
 	int wifiStrength;
 	String wifiSSID;
 	String wifiSpeed;
-
-	// UI vars
-	private TextView wifiSSIDTextView;
-	private TextView wifiStrengthTextView;
-	private TextView wifiSpeedTextView;
-
-	private Button startLocationUpdatesButton;
-	private Button getDataPointButton;
-
-	private TextView latitudeTextView;
-	private TextView longitudeTextView;
-	private TextView lastUpdateTimeTextView;
-	private TextView locationAccuracyTextView;
-
-	private Button timerToggleButton;
-	private EditText intervalEditText;
 
 	// Timer stuff
 	private boolean timerRunning = false;
@@ -89,145 +74,38 @@ public class MainActivity extends Activity
 	boolean currentlyScanning = false;
 
 
+	/**
+	 * Fragment managing the behaviors, interactions and presentation of the navigation drawer.
+	 */
+	private NavigationDrawerFragment mNavigationDrawerFragment;
+	private Toolbar mToolbar;
+
+	public void onScannerSelected(MainActivity m) {
+
+	}
+
+	public void onMapSelected(MainActivity m) {
+
+	}
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+		mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+		setSupportActionBar(mToolbar);
 
-		// Setting the UI vars
-		assignUIElements();
+		mNavigationDrawerFragment = (NavigationDrawerFragment) getFragmentManager().findFragmentById(R.id.fragment_drawer);
 
-		//updateValuesFromBundle(savedInstanceState);
+		// Set up the drawer.
+		mNavigationDrawerFragment.setup(R.id.fragment_drawer, (DrawerLayout) findViewById(R.id.drawer), mToolbar);
 
 		// First we need to check availability of play services
 		if (checkPlayServices()) {
 			// Building the GoogleApi client
 			buildGoogleApiClient();
 		} // end if
-
-	} // end onCreate()
-
-	public void showToast(String message) {
-		Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
-	} // end showToast()
-
-
-	private void initWifiScan() {
-		wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-		wifiBroadcastReceiver = new WifiBroadcastReceiver(this);
-		wifiIntentFilter = new IntentFilter();
-		wifiIntentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
-		this.registerReceiver(wifiBroadcastReceiver, wifiIntentFilter);
-
-		showToast("Registered WifiBroadcastReceiver");
-	} // end initWifiScan()
-
-
-	// Runs without a timer by reposting this handler at the end of the runnable
-	Handler timerHandler = new Handler();
-	Runnable timerRunnable = new Runnable() {
-		@Override
-		public void run() {
-
-
-			timerHandler.postDelayed(this, timerInterval);
-		} // end run()
-	};
-
-	private void assignUIElements() {
-		startLocationUpdatesButton = (Button) findViewById(R.id.buttonLocationUpdates);
-		getDataPointButton = (Button) findViewById(R.id.buttonGetData);
-
-		wifiSSIDTextView = (TextView) findViewById(R.id.textViewWifiSSID);
-		wifiStrengthTextView = (TextView) findViewById(R.id.textViewWifiStrength);
-		wifiSpeedTextView = (TextView) findViewById(R.id.textViewWifiSpeed);
-
-		latitudeTextView = (TextView) findViewById(R.id.textViewLatitude);
-		longitudeTextView = (TextView) findViewById(R.id.textViewLongitude);
-		locationAccuracyTextView = (TextView) findViewById(R.id.textViewLocationAccuracy);
-		lastUpdateTimeTextView = (TextView) findViewById(R.id.textViewLastUpdateTime);
-
-		timerToggleButton = (Button) findViewById(R.id.buttonTimerToggle);
-		intervalEditText = (EditText) findViewById(R.id.editTextInterval);
-
-		timerToggleButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				/*
-				if (timerRunning) {
-					timerHandler.removeCallbacks(timerRunnable);
-
-					timerRunning = false;
-					timerToggleButton.setText("Start Timer");
-				} else {
-					// Set the interval to the value the user entered
-					timerInterval = Long.parseLong(intervalEditText.getText().toString());
-					timerHandler.postDelayed(timerRunnable, 0);
-
-					timerRunning = true;
-					timerToggleButton.setText("Stop Timer");
-				} // end else/if
-
-				*/
-				if(!currentlyScanning) {
-					currentlyScanning = true;
-					wifiManager.startScan();
-
-					timerToggleButton.setText("Stop Timer");
-				} else {
-					currentlyScanning = false;
-
-					timerToggleButton.setText("Start Timer");
-				} // end else/if
-
-
-			} // end onClick()
-		});
-
-		// Toggling the periodic location updates
-		startLocationUpdatesButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				togglePeriodicLocationUpdates();
-			} // end onClick()
-		});
-
-		getDataPointButton.setOnClickListener(new View.OnClickListener() {
-			public void onClick(View v) {
-				WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-
-				/*
-					The level of 100% is equivalent to the signal level of -35 dBm and higher, e.g.
-					both -25 dBm and -15 dBm will be shown as 100%, because this level of signal is very high.
-					The level of 1% is equivalent to the signal level of -95 dBm.
-					Between -95 dBm and -35 dBm, the percentage scale is linear, i.e. 50% is equivalent to -65 dBm
-				*/
-				wifiSSID = WifiUtils.getWifiSSID(wifi);
-				wifiSSIDTextView.setText("Wifi SSID: \"" + wifiSSID + "\"");
-
-				wifiStrength = WifiUtils.getWifiStrength(wifi);
-				wifiStrengthTextView.setText("Wifi Strength: " + wifiStrength);
-
-				wifiSpeed = WifiUtils.getWifiLinkSpeed(wifi);
-				wifiSpeedTextView.setText("Wifi Speed: " + wifiSpeed);
-
-				createLocationRequest();
-				getLastKnownLocation();
-
-				// Write the collected data to JSON file on SD card
-				//writeDataToSDCard();
-			} // end onClick()
-		});
-	} // end assignUIElements()
-
-	protected void updateUI() {
-		latitudeTextView.setText(String.valueOf("Latitude: " + mCurrentLocation.getLatitude()));
-		longitudeTextView.setText(String.valueOf("Longitude: " + mCurrentLocation.getLongitude()));
-		locationAccuracyTextView.setText("Location Accuracy: " + mCurrentLocation.getAccuracy() + "m");
-		lastUpdateTimeTextView.setText("Last Update Time: " + mLastUpdateTime);
-
-		//showToast("updateUI() fired");
-	} // end updateUI()
+	}
 
 	@Override
 	protected void onStart() {
@@ -247,7 +125,7 @@ public class MainActivity extends Activity
 	protected void onResume() {
 		super.onResume();
 
-		if(mGoogleApiClient.isConnected() && mRequestingLocationUpdates) {
+		if (mGoogleApiClient.isConnected() && mRequestingLocationUpdates) {
 			startLocationUpdates();
 		} // end if
 	} // end onResume()
@@ -257,6 +135,8 @@ public class MainActivity extends Activity
 		super.onStop();
 
 		disconnectGoogleApiClient();
+
+		this.unregisterReceiver(wifiBroadcastReceiver);
 	} // end onStop()
 
 	@Override
@@ -266,47 +146,60 @@ public class MainActivity extends Activity
 		disconnectGoogleApiClient();
 	} // end onDestroy()
 
-	/*
-	public void onSaveInstanceState(Bundle savedInstanceState) {
-		savedInstanceState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY, mRequestingLocationUpdates);
-		savedInstanceState.putParcelable(LOCATION_KEY, mCurrentLocation);
-		savedInstanceState.putString(LAST_UPDATED_TIME_STRING_KEY, mLastUpdateTime);
-		super.onSaveInstanceState(savedInstanceState);
+	@Override
+	public void onNavigationDrawerItemSelected(int position) {
+		// update the main content by replacing fragments
+		Toast.makeText(this, "Menu item selected -> " + position, Toast.LENGTH_SHORT).show();
+
+		Fragment fragment;
+		switch (position) {
+			case 0: // Scanner fragment
+				fragment = getFragmentManager().findFragmentByTag(ScannerFragment.TAG);
+
+				if (fragment == null) {
+					fragment = new ScannerFragment();
+				} // end if
+
+				getFragmentManager().beginTransaction().replace(R.id.container, fragment, ScannerFragment.TAG).commit();
+
+				break;
+			case 1: // Map fragment
+				fragment = getFragmentManager().findFragmentByTag(MapFragment.TAG);
+
+				if (fragment == null) {
+					fragment = new MapFragment();
+				} // end if
+
+				getFragmentManager().beginTransaction().replace(R.id.container, fragment, MapFragment.TAG).commit();
+
+				break;
+		} // end switch()
+	} // end onNavigationDrawerItemSelected()
+
+
+	@Override
+	public void onBackPressed() {
+		if (mNavigationDrawerFragment.isDrawerOpen()) {
+			mNavigationDrawerFragment.closeDrawer();
+		} else {
+			super.onBackPressed();
+		} // end if/else
 	}
 
-	private void updateValuesFromBundle(Bundle savedInstanceState) {
-		if (savedInstanceState != null) {
-			// Update the value of mRequestingLocationUpdates from the Bundle, and
-			// make sure that the Start Updates and Stop Updates buttons are
-			// correctly enabled or disabled.
-			if (savedInstanceState.keySet().contains(REQUESTING_LOCATION_UPDATES_KEY)) {
-				mRequestingLocationUpdates = savedInstanceState.getBoolean(REQUESTING_LOCATION_UPDATES_KEY);
-				setButtonsEnabledState();
-			}
-
-			// Update the value of mCurrentLocation from the Bundle and update the
-			// UI to show the correct latitude and longitude.
-			if (savedInstanceState.keySet().contains(LOCATION_KEY)) {
-				// Since LOCATION_KEY was found in the Bundle, we can be sure that
-				// mCurrentLocationis not null.
-				mCurrentLocation = savedInstanceState.getParcelable(LOCATION_KEY);
-			}
-
-			// Update the value of mLastUpdateTime from the Bundle and update the UI.
-			if (savedInstanceState.keySet().contains(LAST_UPDATED_TIME_STRING_KEY)) {
-				mLastUpdateTime = savedInstanceState.getString(LAST_UPDATED_TIME_STRING_KEY);
-			}
-			updateUI();
-		}
-	}
-	*/
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
-		getMenuInflater().inflate(R.menu.menu_main, menu);
-		return true;
+		if (!mNavigationDrawerFragment.isDrawerOpen()) {
+			// Only show items in the action bar relevant to this screen
+			// if the drawer is not showing. Otherwise, let the drawer
+			// decide what to show in the action bar.
+			getMenuInflater().inflate(R.menu.main, menu);
+			return true;
+		} // end if
+
+		return super.onCreateOptionsMenu(menu);
 	} // end onCreateOptionsMenu()
+
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
@@ -316,17 +209,32 @@ public class MainActivity extends Activity
 		int id = item.getItemId();
 
 		//noinspection SimplifiableIfStatement
-		if(id == R.id.action_settings) {
+		if (id == R.id.action_settings) {
 			return true;
 		} // end if
 
 		return super.onOptionsItemSelected(item);
 	} // end onOptionsItemSelected()
 
+	public void showToast(String message) {
+		Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
+	} // end showToast()
+
+
+	private void initWifiScan() {
+		wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+		wifiBroadcastReceiver = new WifiBroadcastReceiver(this);
+		wifiIntentFilter = new IntentFilter();
+		wifiIntentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
+		this.registerReceiver(wifiBroadcastReceiver, wifiIntentFilter);
+
+		showToast("Registered WifiBroadcastReceiver");
+	} // end initWifiScan()
+
 	/* Checks if external storage is available for read and write */
 	public boolean isExternalStorageWritable() {
 		String state = Environment.getExternalStorageState();
-		if(Environment.MEDIA_MOUNTED.equals(state)) {
+		if (Environment.MEDIA_MOUNTED.equals(state)) {
 			return true;
 		} // end if
 
@@ -360,7 +268,7 @@ public class MainActivity extends Activity
 			// Write to disk
 			try {
 				mapper.writeValue(wiFile, fingerprint);
-			} catch(Exception e) {
+			} catch (Exception e) {
 				// Catch exception
 				e.printStackTrace();
 			} // end try/catch
@@ -368,19 +276,6 @@ public class MainActivity extends Activity
 			showToast("Wrote to " + wiFile.getName());
 		} // end if
 	} // end writeDataToSDCard()
-
-	/*
-	public static <T> T fromJSON(final File json, final TypeReference<T> type) {
-		T data = null;
-
-		try {
-			data = new ObjectMapper().readValue(json, type);
-		} catch (Exception e) {
-			// Handle the problem
-		}
-		return data;
-	}
-	*/
 
 	/**
 	 * Method to verify google play services on the device
@@ -443,11 +338,8 @@ public class MainActivity extends Activity
 	/**
 	 * Method to toggle periodic location updates
 	 */
-	private void togglePeriodicLocationUpdates() {
+	protected void togglePeriodicLocationUpdates() {
 		if (!mRequestingLocationUpdates) {
-			// Changing the button text
-			startLocationUpdatesButton.setText(getString(R.string.stop_location_updates_button));
-
 			mRequestingLocationUpdates = true;
 
 			// Starting the location updates
@@ -455,9 +347,6 @@ public class MainActivity extends Activity
 
 			Log.d(TAG, "Periodic location updates started!");
 		} else {
-			// Changing the button text
-			startLocationUpdatesButton.setText(getString(R.string.start_location_updates_button));
-
 			mRequestingLocationUpdates = false;
 
 			// Stopping the location updates
@@ -472,17 +361,13 @@ public class MainActivity extends Activity
 	public void onLocationChanged(Location location) {
 		mCurrentLocation = location;
 		mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-		updateUI();
+		//updateUI();
 
 		//showToast("onLocationChanged() fired");
 	} // end onLocationChanged()
 
 	protected synchronized void buildGoogleApiClient() {
-		mGoogleApiClient = new GoogleApiClient.Builder(this)
-				.addConnectionCallbacks(this)
-				.addOnConnectionFailedListener(this)
-				.addApi(LocationServices.API)
-				.build();
+		mGoogleApiClient = new GoogleApiClient.Builder(this).addConnectionCallbacks(this).addOnConnectionFailedListener(this).addApi(LocationServices.API).build();
 
 		createLocationRequest();
 
@@ -490,7 +375,7 @@ public class MainActivity extends Activity
 	} // end buildGoogleApiClient()
 
 	private void disconnectGoogleApiClient() {
-		if(mGoogleApiClient.isConnected()) {
+		if (mGoogleApiClient.isConnected()) {
 			mGoogleApiClient.disconnect();
 		} // end if
 	} // end disconnectGoogleApiClient()
@@ -499,8 +384,8 @@ public class MainActivity extends Activity
 		mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
 
 		if (mLastLocation != null) {
-			latitudeTextView.setText(String.valueOf("Latitude: " + mLastLocation.getLatitude()));
-			longitudeTextView.setText(String.valueOf("Longitude:" + mLastLocation.getLongitude()));
+			//latitudeTextView.setText(String.valueOf("Latitude: " + mLastLocation.getLatitude()));
+			//longitudeTextView.setText(String.valueOf("Longitude:" + mLastLocation.getLongitude()));
 		} // end if
 	} // end getLastKnownLocation()
 
@@ -509,7 +394,7 @@ public class MainActivity extends Activity
 		getLastKnownLocation();
 
 
-		if(mRequestingLocationUpdates) {
+		if (mRequestingLocationUpdates) {
 			startLocationUpdates();
 		} // end if
 
@@ -529,4 +414,4 @@ public class MainActivity extends Activity
 		Log.i(TAG, "Connection failed: ConnectionResult.getErrorCode() = " + connectionResult.getErrorCode());
 	} // end onConnectionFailed()
 
-}
+} // end class
