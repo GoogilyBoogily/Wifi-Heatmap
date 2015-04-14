@@ -172,6 +172,7 @@ public class ScannerFragment extends Fragment {
 				m.createLocationRequest();
 				m.getLastKnownLocation();
 
+				updateUI();
 				// Write the collected data to JSON file on SD card
 				//writeDataToSDCard();
 			} // end onClick()

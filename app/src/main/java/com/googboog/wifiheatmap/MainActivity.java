@@ -1,9 +1,10 @@
 package com.googboog.wifiheatmap;
 
-import android.app.Fragment;
 import android.content.Context;
 import android.content.IntentFilter;
+import android.location.Criteria;
 import android.location.Location;
+import android.location.LocationManager;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
@@ -22,20 +23,29 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.TileOverlay;
+import com.google.android.gms.maps.model.TileOverlayOptions;
+import com.google.maps.android.heatmaps.HeatmapTileProvider;
+import com.google.maps.android.heatmaps.WeightedLatLng;
 
 import java.io.File;
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 
 
 public class MainActivity
 		extends ActionBarActivity
 		implements NavigationDrawerCallbacks, ScannerFragment.OnScannerSelectedListener, MapFragment.OnMapSelectedListener,
-		GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+		GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener, OnMapReadyCallback {
 
 	// Logcat tag
 	protected static final String TAG = MainActivity.class.getSimpleName();
-
 
 	private GoogleApiClient mGoogleApiClient;
 	private Location mLastLocation;
@@ -72,6 +82,8 @@ public class MainActivity
 
 	// Bool for if we're currently scanning
 	boolean currentlyScanning = false;
+
+	GoogleMap mGoogleMap;
 
 
 	/**
@@ -151,30 +163,109 @@ public class MainActivity
 		// update the main content by replacing fragments
 		Toast.makeText(this, "Menu item selected -> " + position, Toast.LENGTH_SHORT).show();
 
-		Fragment fragment;
 		switch (position) {
 			case 0: // Scanner fragment
-				fragment = getFragmentManager().findFragmentByTag(ScannerFragment.TAG);
+				ScannerFragment scanFragment = (ScannerFragment) getFragmentManager().findFragmentByTag(ScannerFragment.TAG);
 
-				if (fragment == null) {
-					fragment = new ScannerFragment();
+				if (scanFragment == null) {
+					scanFragment = new ScannerFragment();
 				} // end if
 
-				getFragmentManager().beginTransaction().replace(R.id.container, fragment, ScannerFragment.TAG).commit();
+				getFragmentManager().beginTransaction().replace(R.id.container, scanFragment, ScannerFragment.TAG).commit();
 
 				break;
 			case 1: // Map fragment
-				fragment = getFragmentManager().findFragmentByTag(MapFragment.TAG);
+				com.google.android.gms.maps.MapFragment mapFragment = (com.google.android.gms.maps.MapFragment) getFragmentManager().findFragmentById(R.id.map);
 
-				if (fragment == null) {
-					fragment = new MapFragment();
+				if (mapFragment == null) {
+					mapFragment = MapFragment.newInstance();
 				} // end if
 
-				getFragmentManager().beginTransaction().replace(R.id.container, fragment, MapFragment.TAG).commit();
+				mapFragment.getMapAsync(this);
+
+				getFragmentManager().beginTransaction().replace(R.id.container, mapFragment, MapFragment.TAG).commit();
 
 				break;
 		} // end switch()
 	} // end onNavigationDrawerItemSelected()
+
+	@Override
+	public void onMapReady(GoogleMap map) {
+		mGoogleMap = map;
+
+		map.setMyLocationEnabled(true);
+
+		// Zoom the camera into the user's current position
+		LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+		Criteria criteria = new Criteria();
+
+		Location location = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, false));
+		if (location != null) {
+			map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), 13));
+
+			CameraPosition cameraPosition = new CameraPosition.Builder().target(new LatLng(location.getLatitude(), location.getLongitude()))      // Sets the center of the map to location user
+					.zoom(17)                   // Sets the zoom
+					//.bearing(90)                // Sets the orientation of the camera to east
+					//.tilt(40)                   // Sets the tilt of the camera to 30 degrees
+					.build();                   // Creates a CameraPosition from the builder
+			map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+
+		} // end if
+
+		addHeatmap();
+	} // end onMapReady()
+
+	public void addHeatmap() {
+		ArrayList<WeightedLatLng> wifiData = getWeightedLatLngList();
+
+		// Create a heat map tile provider, passing it the latlngs
+		HeatmapTileProvider mProvider = new HeatmapTileProvider.Builder().weightedData(wifiData).build();
+		// Add a tile overlay to the map, using the heat map tile provider.
+		TileOverlay mOverlay = mGoogleMap.addTileOverlay(new TileOverlayOptions().tileProvider(mProvider));
+	} // end addHeatMap()
+
+	public ArrayList<WeightedLatLng> getWeightedLatLngList() {
+		ArrayList<WeightedLatLng> data = new ArrayList<>();
+
+		// Get SD card path
+		File sdCard = Environment.getExternalStorageDirectory();
+		// Grab the app directory
+		File dir = new File(sdCard.getAbsolutePath() + "/WiFiHeatMap/DataPoints");
+
+		// Get a list of the files in the current dir
+		File files[] = dir.listFiles();
+
+		ObjectMapper mapper = new ObjectMapper();
+
+		// For each data fingerprint we have in the directory
+		for (File file : files) {
+			try {
+				// Grab the data point from the file
+				DataFingerprint dataPoint = mapper.readValue(file, DataFingerprint.class);
+
+				// Create the new latlng object with the latitude and longitude
+				LatLng latLng = new LatLng(dataPoint.getLatitude(), dataPoint.getLongitude());
+
+				// Grab each wifi that was detected at this latlng
+				ArrayList<WifiFingerprint> detectedWifis = dataPoint.getDetectedWifis();
+
+				for (WifiFingerprint wifi : detectedWifis) {
+					if (wifi.getSSID().equals("UMD-Wireless")) {
+						// Create the weighted data point with the level added to 100 in order to get a positive value
+						WeightedLatLng weightedLatLng = new WeightedLatLng(latLng, 100 + wifi.getLevel());
+
+						// Add the generated weighted latlng to the list
+						data.add(weightedLatLng);
+					} // end if
+				} // end for
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			} // end try/catch
+		} // end for
+
+		return data;
+	} // end getWeightedLatLngList()
 
 
 	@Override
@@ -184,7 +275,7 @@ public class MainActivity
 		} else {
 			super.onBackPressed();
 		} // end if/else
-	}
+	} // end onBackPressed()
 
 
 	@Override
