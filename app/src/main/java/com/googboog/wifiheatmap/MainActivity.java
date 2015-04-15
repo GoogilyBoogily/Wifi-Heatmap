@@ -251,8 +251,9 @@ public class MainActivity
 
 				for (WifiFingerprint wifi : detectedWifis) {
 					if (wifi.getSSID().equals("UMD-Wireless")) {
-						// Create the weighted data point with the level added to 100 in order to get a positive value
-						WeightedLatLng weightedLatLng = new WeightedLatLng(latLng, 100 + wifi.getLevel());
+						// Create the weighted data point with the normalized WiFi level
+						double normalizedWifiLevel = getNormalizedWiFiLevel(wifi.getLevel());
+						WeightedLatLng weightedLatLng = new WeightedLatLng(latLng, normalizedWifiLevel);
 
 						// Add the generated weighted latlng to the list
 						data.add(weightedLatLng);
@@ -266,6 +267,25 @@ public class MainActivity
 
 		return data;
 	} // end getWeightedLatLngList()
+
+	public double getNormalizedWiFiLevel(int wifiLevel) {
+		double normalizedLevel;
+		double choppedLevel = wifiLevel;
+
+		// Anything bigger than -35 is still 100% and anything under -95 is still 0%
+		if (choppedLevel > -35) {
+			choppedLevel = -35;
+		} else if (choppedLevel < -95) {
+			choppedLevel = -95;
+		} // end else/if
+
+		// Normalize the level with (x - min)/(max - min)
+		normalizedLevel = (choppedLevel - (-95.0)) / ((-35.0) - (-95.0));
+
+		Log.d(TAG, "Normalized level: " + String.valueOf(normalizedLevel));
+
+		return normalizedLevel;
+	} // end getNormalizedWiFiLevel()
 
 
 	@Override
