@@ -461,7 +461,7 @@ public class MainActivity
 				.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
 				.setInterval(100);
 
-		ReactiveLocationProvider locationProvider = new ReactiveLocationProvider(this);
+		ReactiveLocationProvider locationProvider = new ReactiveLocationProvider(getApplicationContext());
 		fingerprintCollectionSub = locationProvider.getUpdatedLocation(request).filter(new Func1<Location, Boolean>() {
 			@Override
 			public Boolean call(Location location) {

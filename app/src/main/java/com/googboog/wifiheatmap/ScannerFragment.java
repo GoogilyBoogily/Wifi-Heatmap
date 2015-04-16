@@ -154,8 +154,6 @@ public class ScannerFragment extends Fragment {
 		startLocationUpdatesButton.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				m.togglePeriodicLocationUpdates();
-
 				if (!m.mRequestingLocationUpdates) {
 					// Changing the button text
 					startLocationUpdatesButton.setText(getString(R.string.stop_location_updates_button));
