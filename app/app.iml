@@ -94,6 +94,7 @@
     <orderEntry type="library" exported="" name="recyclerview-v7-22.0.0" level="project" />
     <orderEntry type="library" exported="" name="play-services-wearable-7.0.0" level="project" />
     <orderEntry type="library" exported="" name="play-services-panorama-7.0.0" level="project" />
+    <orderEntry type="library" exported="" name="android-reactive-location-0.5" level="project" />
     <orderEntry type="library" exported="" name="support-annotations-22.0.0" level="project" />
     <orderEntry type="library" exported="" name="play-services-plus-7.0.0" level="project" />
     <orderEntry type="library" exported="" name="play-services-7.0.0" level="project" />
@@ -106,6 +107,7 @@
     <orderEntry type="library" exported="" name="play-services-safetynet-7.0.0" level="project" />
     <orderEntry type="library" exported="" name="jackson-core-2.5.2" level="project" />
     <orderEntry type="library" exported="" name="play-services-nearby-7.0.0" level="project" />
+    <orderEntry type="library" exported="" name="rxjava-1.0.8" level="project" />
     <orderEntry type="library" exported="" name="play-services-fitness-7.0.0" level="project" />
     <orderEntry type="library" exported="" name="support-v4-22.0.0" level="project" />
     <orderEntry type="library" exported="" name="jackson-databind-2.5.2" level="project" />

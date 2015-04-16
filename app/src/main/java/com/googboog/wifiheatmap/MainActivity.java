@@ -2,6 +2,12 @@ package com.googboog.wifiheatmap;
 
 import android.content.Context;
 import android.content.IntentFilter;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RadialGradient;
+import android.graphics.Shader;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
@@ -27,16 +33,21 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.TileOverlay;
-import com.google.android.gms.maps.model.TileOverlayOptions;
-import com.google.maps.android.heatmaps.HeatmapTileProvider;
 import com.google.maps.android.heatmaps.WeightedLatLng;
 
 import java.io.File;
 import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+
+import pl.charmas.android.reactivelocation.ReactiveLocationProvider;
+import rx.Subscription;
+import rx.functions.Action1;
 
 
 public class MainActivity
@@ -117,7 +128,23 @@ public class MainActivity
 			// Building the GoogleApi client
 			buildGoogleApiClient();
 		} // end if
-	}
+
+
+
+
+		LocationRequest request = LocationRequest.create() //standard GMS LocationRequest
+				.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+				.setInterval(100);
+
+		ReactiveLocationProvider locationProvider = new ReactiveLocationProvider(this);
+		Subscription subscription = locationProvider.getUpdatedLocation(request)
+		.subscribe(new Action1<Location>() {
+			@Override
+			public void call(Location location) {
+				Log.d(TAG, location.toString());
+			} // end call()
+		});
+	} // end onCreate()
 
 	@Override
 	protected void onStart() {
@@ -204,7 +231,7 @@ public class MainActivity
 			map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), 13));
 
 			CameraPosition cameraPosition = new CameraPosition.Builder().target(new LatLng(location.getLatitude(), location.getLongitude()))      // Sets the center of the map to location user
-					.zoom(17)                   // Sets the zoom
+					.zoom(20)                   // Sets the zoom
 					//.bearing(90)                // Sets the orientation of the camera to east
 					//.tilt(40)                   // Sets the tilt of the camera to 30 degrees
 					.build();                   // Creates a CameraPosition from the builder
@@ -216,13 +243,109 @@ public class MainActivity
 	} // end onMapReady()
 
 	public void addHeatmap() {
-		ArrayList<WeightedLatLng> wifiData = getWeightedLatLngList();
+		//ArrayList<WeightedLatLng> wifiData = getWeightedLatLngList();
 
+		// For all collected data fingerprints
+		for (DataFingerprint dataFingerprint : getDataFingerprints()) {
+
+			ArrayList<WifiFingerprint> wifis = dataFingerprint.getDetectedWifis();
+
+			Collections.sort(wifis, new Comparator<WifiFingerprint>() {
+				@Override
+				public int compare(WifiFingerprint finger1, WifiFingerprint finger2) {
+
+					return Integer.compare(finger2.getLevel(), finger1.getLevel());
+				} // end compare()
+			});
+
+			// For all detected wifis at the data fingerprint
+			for (WifiFingerprint wifi : wifis) {
+
+				if (wifi.getSSID().equals("UMD-Wireless")) {
+					Log.d(TAG, wifi.getBSSID() + ": " + wifi.getLevel());
+
+					float normalizedLevel = getNormalizedWiFiLevel(wifi.getLevel()) ;
+					int colorIntensity = generateColorIntensity(normalizedLevel);
+
+					// Instantiates a new CircleOptions object and defines the center and radius
+					CircleOptions circleOptions = new CircleOptions()
+							.center(new LatLng(dataFingerprint.getLatitude(), dataFingerprint.getLongitude()))
+							.radius(2) // In meters
+							.fillColor(colorIntensity)
+							.strokeColor(Color.TRANSPARENT); // Don't show the border to the circle
+					// Get back the mutable Circle
+					Circle circle = mGoogleMap.addCircle(circleOptions);
+
+					break;
+				} // end if
+			} // end for
+		} // end for
+
+
+
+		/*
 		// Create a heat map tile provider, passing it the latlngs
 		HeatmapTileProvider mProvider = new HeatmapTileProvider.Builder().weightedData(wifiData).build();
 		// Add a tile overlay to the map, using the heat map tile provider.
 		TileOverlay mOverlay = mGoogleMap.addTileOverlay(new TileOverlayOptions().tileProvider(mProvider));
+		*/
 	} // end addHeatMap()
+
+	public int generateColorIntensity(float intensity) {
+		int color1 = Color.rgb(102, 225, 0);
+		int color2 = Color.rgb(255, 0, 0);
+
+		//int alpha = (int) ((Color.alpha(color2) - Color.alpha(color1)) * intensity + Color.alpha(color1));
+		int alpha = 50;
+
+		float[] hsv1 = new float[3];
+		Color.RGBToHSV(Color.red(color1), Color.green(color1), Color.blue(color1), hsv1);
+		float[] hsv2 = new float[3];
+		Color.RGBToHSV(Color.red(color2), Color.green(color2), Color.blue(color2), hsv2);
+
+		// Adjust so that the shortest path on the color wheel will be taken
+		if (hsv1[0] - hsv2[0] > 180) {
+			hsv2[0] += 360;
+		} else if (hsv2[0] - hsv1[0] > 180) {
+			hsv1[0] += 360;
+		} // end if/else
+
+		// Interpolate using calculated ratio
+		float[] result = new float[3];
+		for (int i = 0; i < 3; i++) {
+			result[i] = (hsv2[i] - hsv1[i]) * (intensity) + hsv1[i];
+		} // end for
+
+		return Color.HSVToColor(alpha, result);
+	} // end generateColorIntensity()
+
+	public ArrayList<DataFingerprint> getDataFingerprints() {
+		ArrayList<DataFingerprint> data = new ArrayList<>();
+
+		// Get SD card path
+		File sdCard = Environment.getExternalStorageDirectory();
+		// Grab the app directory
+		File dir = new File(sdCard.getAbsolutePath() + "/WiFiHeatMap/DataPoints");
+
+		// Get a list of the files in the current dir
+		File files[] = dir.listFiles();
+
+		ObjectMapper mapper = new ObjectMapper();
+
+		// For each data fingerprint we have in the directory
+		for (File file : files) {
+			try {
+				// Grab the data point from the file
+				DataFingerprint dataPoint = mapper.readValue(file, DataFingerprint.class);
+
+				data.add(dataPoint);
+			} catch (Exception e) {
+				e.printStackTrace();
+			} // end try/catch
+		} // end for
+
+		return data;
+	} // end getDataFingerprints()
 
 	public ArrayList<WeightedLatLng> getWeightedLatLngList() {
 		ArrayList<WeightedLatLng> data = new ArrayList<>();
@@ -268,24 +391,55 @@ public class MainActivity
 		return data;
 	} // end getWeightedLatLngList()
 
-	public double getNormalizedWiFiLevel(int wifiLevel) {
-		double normalizedLevel;
-		double choppedLevel = wifiLevel;
+	public float getNormalizedWiFiLevel(int wifiLevel) {
+		float normalizedLevel;
+		float choppedLevel = wifiLevel;
 
 		// Anything bigger than -35 is still 100% and anything under -95 is still 0%
 		if (choppedLevel > -35) {
-			choppedLevel = -35;
+			choppedLevel = -35.0f;
 		} else if (choppedLevel < -95) {
-			choppedLevel = -95;
+			choppedLevel = -95.0f;
 		} // end else/if
 
 		// Normalize the level with (x - min)/(max - min)
-		normalizedLevel = (choppedLevel - (-95.0)) / ((-35.0) - (-95.0));
+		normalizedLevel = (choppedLevel - (-95.0f)) / ((-35.0f) - (-95.0f));
 
 		Log.d(TAG, "Normalized level: " + String.valueOf(normalizedLevel));
 
 		return normalizedLevel;
 	} // end getNormalizedWiFiLevel()
+
+	public Canvas generateHeatmap(GoogleMap map, DataFingerprint dataPoint) {
+		int width = 100;
+		int height = 100;
+
+		Bitmap backbuffer = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+		Canvas myCanvas = new Canvas(backbuffer);
+		Paint p = new Paint();
+		p.setStyle(Paint.Style.FILL);
+		p.setColor(Color.TRANSPARENT);
+		myCanvas.drawRect(0, 0, width, height, p);
+
+
+		ArrayList<WifiFingerprint> detectedWifis = dataPoint.getDetectedWifis();
+
+		for (WifiFingerprint wifi : detectedWifis) {
+			float x = (float) dataPoint.getLatitude();
+			float y = (float) dataPoint.getLongitude();
+			float radius = dataPoint.getAccuracy();
+
+			int intensity = (int) getNormalizedWiFiLevel(wifi.getLevel()) * 10;
+
+			RadialGradient g = new RadialGradient(x, y, radius, Color.argb(Math.max(10 * intensity, 255), 0, 0, 0), Color.TRANSPARENT, Shader.TileMode.CLAMP);
+			Paint gp = new Paint();
+			gp.setShader(g);
+			myCanvas.drawCircle(x, y, radius, gp);
+		} // end for
+
+
+		return myCanvas;
+	} // end generateHeatmap()
 
 
 	@Override
