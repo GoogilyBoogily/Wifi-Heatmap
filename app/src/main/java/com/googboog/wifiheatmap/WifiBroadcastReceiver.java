@@ -46,39 +46,39 @@ class WifiBroadcastReceiver extends BroadcastReceiver {
 
 		//Collections.sort(scanResultList, RSSI_ORDER);
 
-
-		// Schedule next scan after short delay
-
-		// Only schedule a new scan if we're currently scanning
+		// Only write data and schedule a new scan if we're currently scanning
 		if(m.currentlyScanning) {
-			// Create and begin populating a new data fingerprint
-			DataFingerprint fingerprint = new DataFingerprint();
-			fingerprint.setLatitude(m.mCurrentLocation.getLatitude());
-			fingerprint.setLongitude(m.mCurrentLocation.getLongitude());
-			fingerprint.setAltitude(m.mCurrentLocation.getAltitude());
-			fingerprint.setAccuracy(m.mCurrentLocation.getAccuracy());
-			fingerprint.setTimestamp(m.mLastUpdateTime);
+			// Only write the data if we have the location
+			if (m.mCurrentLocation != null) {
+				// Create and begin populating a new data fingerprint
+				DataFingerprint fingerprint = new DataFingerprint();
+				fingerprint.setLatitude(m.mCurrentLocation.getLatitude());
+				fingerprint.setLongitude(m.mCurrentLocation.getLongitude());
+				fingerprint.setAltitude(m.mCurrentLocation.getAltitude());
+				fingerprint.setAccuracy(m.mCurrentLocation.getAccuracy());
+				fingerprint.setTimestamp(m.mLastUpdateTime);
 
-			ArrayList<WifiFingerprint> detectedWifis = new ArrayList<>();
-			for (ScanResult wifi : scanResultList) {
-				// Create and populate the wifi result
-				WifiFingerprint wifiResult = new WifiFingerprint();
-				wifiResult.setSSID(wifi.SSID);
-				wifiResult.setBSSID(wifi.BSSID);
-				wifiResult.setFrequency(wifi.frequency);
-				wifiResult.setLevel(wifi.level);
+				ArrayList<WifiFingerprint> detectedWifis = new ArrayList<>();
+				for (ScanResult wifi : scanResultList) {
+					// Create and populate the wifi result
+					WifiFingerprint wifiResult = new WifiFingerprint();
+					wifiResult.setSSID(wifi.SSID);
+					wifiResult.setBSSID(wifi.BSSID);
+					wifiResult.setFrequency(wifi.frequency);
+					wifiResult.setLevel(wifi.level);
 
-				// Add the wifi to the list of all detected wifis
-				detectedWifis.add(wifiResult);
+					// Add the wifi to the list of all detected wifis
+					detectedWifis.add(wifiResult);
 
-				log(wifi, NOT_SPECIAL);
-			} // end for
+					log(wifi, NOT_SPECIAL);
+				} // end for
 
-			fingerprint.setDetectedWifis(detectedWifis);
+				fingerprint.setDetectedWifis(detectedWifis);
 
 
-			m.writeDataToSDCard(fingerprint);
-
+				m.writeDataToSDCard(fingerprint);
+			} // end if
+			// Schedule next scan after short delay
 			wifiScanTimer.schedule(new TimerTask() {
 				@Override
 				public void run() {
@@ -99,17 +99,12 @@ class WifiBroadcastReceiver extends BroadcastReceiver {
 	} // end convertFrequencyToChannel()
 
 	private void log(ScanResult wifi, int specialCode) {
-		String csvLine = Build.MODEL + "," +
-		//		m.mCurrentLocation.getLatitude() + "," +
-		//		m.mCurrentLocation.getLongitude() + "," +
-		//		m.mCurrentLocation.getAltitude() + "," +
-		//		m.mCurrentLocation.getAccuracy() + "," +
-		//		m.mCurrentLocation.getSpeed() + "," +
-				specialCode;
+		String csvLine = Build.MODEL + ",";
 
 		if (specialCode == NOT_SPECIAL) {
 			csvLine += "," + wifi.SSID // FIXME: escape commas
-					+ ", " + wifi.level + ", " + convertFrequencyToChannel(wifi.frequency);
+					+ ", " + wifi.level
+					+ ", " + convertFrequencyToChannel(wifi.frequency);
 		} else if (specialCode == SPECIAL_NO_VISIBLE_WIFI) {
 			csvLine += ",,,,";
 		} else {

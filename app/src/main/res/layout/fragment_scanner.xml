@@ -87,7 +87,7 @@
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Start timer"
+        android:text="Start collecting data"
         android:id="@+id/buttonTimerToggle"
         android:layout_below="@+id/textViewLastUpdateTime"
         android:layout_centerHorizontal="true"

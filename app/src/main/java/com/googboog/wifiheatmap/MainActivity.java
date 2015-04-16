@@ -25,10 +25,7 @@ import android.widget.Toast;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -48,20 +45,19 @@ import java.util.Date;
 import pl.charmas.android.reactivelocation.ReactiveLocationProvider;
 import rx.Subscription;
 import rx.functions.Action1;
+import rx.functions.Func1;
 
 
 public class MainActivity
 		extends ActionBarActivity
 		implements NavigationDrawerCallbacks, ScannerFragment.OnScannerSelectedListener, MapFragment.OnMapSelectedListener,
-		GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener, OnMapReadyCallback {
+		OnMapReadyCallback {
 
 	// Logcat tag
 	protected static final String TAG = MainActivity.class.getSimpleName();
 
-	private GoogleApiClient mGoogleApiClient;
 	private Location mLastLocation;
 	protected Location mCurrentLocation;
-	private LocationRequest mLocationRequest;
 
 	protected String mLastUpdateTime;
 
@@ -124,72 +120,37 @@ public class MainActivity
 		mNavigationDrawerFragment.setup(R.id.fragment_drawer, (DrawerLayout) findViewById(R.id.drawer), mToolbar);
 
 		// First we need to check availability of play services
-		if (checkPlayServices()) {
-			// Building the GoogleApi client
-			buildGoogleApiClient();
+		if (!checkPlayServices()) {
+			showToast("This device doesn't have Google Play Services...");
 		} // end if
-
-
-
-
-		LocationRequest request = LocationRequest.create() //standard GMS LocationRequest
-				.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-				.setInterval(100);
-
-		ReactiveLocationProvider locationProvider = new ReactiveLocationProvider(this);
-		Subscription subscription = locationProvider.getUpdatedLocation(request)
-		.subscribe(new Action1<Location>() {
-			@Override
-			public void call(Location location) {
-				Log.d(TAG, location.toString());
-			} // end call()
-		});
 	} // end onCreate()
 
 	@Override
 	protected void onStart() {
 		super.onStart();
-
-		if (mGoogleApiClient != null) {
-			mGoogleApiClient.connect();
-		} // end if
 	} // end onStart()
 
 	protected void onPause() {
 		super.onPause();
-
-		stopLocationUpdates();
 	} // end onPause()
 
 	protected void onResume() {
 		super.onResume();
-
-		if (mGoogleApiClient.isConnected() && mRequestingLocationUpdates) {
-			startLocationUpdates();
-		} // end if
 	} // end onResume()
 
 	@Override
 	protected void onStop() {
 		super.onStop();
-
-		disconnectGoogleApiClient();
-
-		this.unregisterReceiver(wifiBroadcastReceiver);
 	} // end onStop()
 
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
-
-		disconnectGoogleApiClient();
 	} // end onDestroy()
 
 	@Override
 	public void onNavigationDrawerItemSelected(int position) {
-		// update the main content by replacing fragments
-		Toast.makeText(this, "Menu item selected -> " + position, Toast.LENGTH_SHORT).show();
-
+		// Update the main content by replacing fragments
 		switch (position) {
 			case 0: // Scanner fragment
 				ScannerFragment scanFragment = (ScannerFragment) getFragmentManager().findFragmentByTag(ScannerFragment.TAG);
@@ -485,6 +446,42 @@ public class MainActivity
 		Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
 	} // end showToast()
 
+	Subscription fingerprintCollectionSub;
+	public void startCollectingDataFingerprints() {
+		showToast("Waiting for location before grabbing first point...");
+
+		// Connect to Wifi broadcast receiver
+		initWifiScan();
+
+		// Start scanning for Wifis
+		wifiManager.startScan();
+
+		// Create location request
+		LocationRequest request = LocationRequest.create()
+				.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+				.setInterval(100);
+
+		ReactiveLocationProvider locationProvider = new ReactiveLocationProvider(this);
+		fingerprintCollectionSub = locationProvider.getUpdatedLocation(request).filter(new Func1<Location, Boolean>() {
+			@Override
+			public Boolean call(Location location) {
+				return location.getAccuracy() < 10.0f;
+			} // end call()
+		}).subscribe(new Action1<Location>() {
+			@Override
+			public void call(Location location) {
+				mCurrentLocation = location;
+				mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
+					} // end call
+				});
+	} // end startCollectingDataFingerprints()
+
+	public void stopCollectingDataFingerprints() {
+		fingerprintCollectionSub.unsubscribe();
+
+		this.unregisterReceiver(wifiBroadcastReceiver);
+	} // end stopCollectingDataFingerprints()
+
 
 	private void initWifiScan() {
 		wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
@@ -492,8 +489,6 @@ public class MainActivity
 		wifiIntentFilter = new IntentFilter();
 		wifiIntentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
 		this.registerReceiver(wifiBroadcastReceiver, wifiIntentFilter);
-
-		showToast("Registered WifiBroadcastReceiver");
 	} // end initWifiScan()
 
 	/* Checks if external storage is available for read and write */
@@ -562,121 +557,5 @@ public class MainActivity
 
 		return true;
 	} // end checkPlayServices()
-
-	/**
-	 * Creating location request object
-	 */
-	protected void createLocationRequest() {
-		mLocationRequest = new LocationRequest();
-
-		// Sets the desired interval for active location updates. This interval is
-		// inexact. You may not receive updates at all if no location sources are available, or
-		// you may receive them slower than requested. You may also receive updates faster than
-		// requested if other applications are requesting location at a faster interval.
-		mLocationRequest.setInterval(UPDATE_INTERVAL);
-
-		// Sets the fastest rate for active location updates. This interval is exact, and your
-		// application will never receive updates faster than this value.
-		mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
-		mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-		//mLocationRequest.setSmallestDisplacement(DISPLACEMENT);
-
-		//showToast("Created location request");
-	} // end createLocationRequest()
-
-	/**
-	 * Starting the location updates
-	 */
-	protected void startLocationUpdates() {
-		LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-		//showToast("Started location updates");
-	} // end startLocationUpdates()
-
-	/**
-	 * Stopping location updates
-	 */
-	protected void stopLocationUpdates() {
-		LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
-		//showToast("Stopped location updates");
-	} // end stopLocationUpdates()
-
-	/**
-	 * Method to toggle periodic location updates
-	 */
-	protected void togglePeriodicLocationUpdates() {
-		if (!mRequestingLocationUpdates) {
-			mRequestingLocationUpdates = true;
-
-			// Starting the location updates
-			startLocationUpdates();
-
-			Log.d(TAG, "Periodic location updates started!");
-		} else {
-			mRequestingLocationUpdates = false;
-
-			// Stopping the location updates
-			stopLocationUpdates();
-
-			Log.d(TAG, "Periodic location updates stopped!");
-		} // end if/else
-	} // end togglePeriodicLocationUpdates()
-
-
-	@Override
-	public void onLocationChanged(Location location) {
-		mCurrentLocation = location;
-		mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-		//updateUI();
-
-		//showToast("onLocationChanged() fired");
-	} // end onLocationChanged()
-
-	protected synchronized void buildGoogleApiClient() {
-		mGoogleApiClient = new GoogleApiClient.Builder(this).addConnectionCallbacks(this).addOnConnectionFailedListener(this).addApi(LocationServices.API).build();
-
-		createLocationRequest();
-
-		//showToast("Built Google API Client!");
-	} // end buildGoogleApiClient()
-
-	private void disconnectGoogleApiClient() {
-		if (mGoogleApiClient.isConnected()) {
-			mGoogleApiClient.disconnect();
-		} // end if
-	} // end disconnectGoogleApiClient()
-
-	public void getLastKnownLocation() {
-		mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-
-		if (mLastLocation != null) {
-			//latitudeTextView.setText(String.valueOf("Latitude: " + mLastLocation.getLatitude()));
-			//longitudeTextView.setText(String.valueOf("Longitude:" + mLastLocation.getLongitude()));
-		} // end if
-	} // end getLastKnownLocation()
-
-	@Override
-	public void onConnected(Bundle connectionHint) {
-		getLastKnownLocation();
-
-
-		if (mRequestingLocationUpdates) {
-			startLocationUpdates();
-		} // end if
-
-		//showToast("Connected to location services");
-
-		// Connect to Wifi broadcast receiver
-		initWifiScan();
-	} // end onConnected()
-
-	@Override
-	public void onConnectionSuspended(int arg0) {
-		mGoogleApiClient.connect();
-	} // end onConnectionSuspended()
-
-	@Override
-	public void onConnectionFailed(ConnectionResult connectionResult) {
-		Log.i(TAG, "Connection failed: ConnectionResult.getErrorCode() = " + connectionResult.getErrorCode());
-	} // end onConnectionFailed()
 
 } // end class

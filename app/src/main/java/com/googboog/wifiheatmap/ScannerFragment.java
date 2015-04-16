@@ -3,6 +3,7 @@ package com.googboog.wifiheatmap;
 import android.app.Activity;
 import android.app.Fragment;
 import android.content.Context;
+import android.location.Location;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
@@ -12,6 +13,16 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+
+import com.google.android.gms.location.LocationRequest;
+
+import java.text.DateFormat;
+import java.util.Date;
+
+import pl.charmas.android.reactivelocation.ReactiveLocationProvider;
+import rx.Subscription;
+import rx.functions.Action1;
+import rx.functions.Func1;
 
 public class ScannerFragment extends Fragment {
 	protected static final String TAG = ScannerFragment.class.getSimpleName();
@@ -37,6 +48,8 @@ public class ScannerFragment extends Fragment {
 
 	private Button timerToggleButton;
 	private EditText intervalEditText;
+
+	private boolean currentlyScanning = false;
 
 	public ScannerFragment() {
 		// Required empty public constructor
@@ -119,18 +132,21 @@ public class ScannerFragment extends Fragment {
 				} // end else/if
 
 				*/
-				if (!m.currentlyScanning) {
+				if (!currentlyScanning) {
+					currentlyScanning = true;
 					m.currentlyScanning = true;
-					m.wifiManager.startScan();
 
-					timerToggleButton.setText("Stop Timer");
+					m.startCollectingDataFingerprints();
+
+					timerToggleButton.setText("Stop collecting data");
 				} else {
+					currentlyScanning = false;
 					m.currentlyScanning = false;
 
-					timerToggleButton.setText("Start Timer");
+					m.stopCollectingDataFingerprints();
+
+					timerToggleButton.setText("Start collecting data");
 				} // end else/if
-
-
 			} // end onClick()
 		});
 
@@ -152,29 +168,44 @@ public class ScannerFragment extends Fragment {
 
 		getDataPointButton.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
-				WifiManager wifi = (WifiManager) m.getSystemService(Context.WIFI_SERVICE);
+				m.showToast("Waiting for location before grabbing data...");
 
-				/*
-					The level of 100% is equivalent to the signal level of -35 dBm and higher, e.g.
-					both -25 dBm and -15 dBm will be shown as 100%, because this level of signal is very high.
-					The level of 1% is equivalent to the signal level of -95 dBm.
-					Between -95 dBm and -35 dBm, the percentage scale is linear, i.e. 50% is equivalent to -65 dBm
-				*/
-				m.wifiSSID = WifiUtils.getWifiSSID(wifi);
-				wifiSSIDTextView.setText("Wifi SSID: \"" + m.wifiSSID + "\"");
+				// Create location request
+				LocationRequest request = LocationRequest.create()
+						.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+						.setInterval(100);
 
-				m.wifiStrength = WifiUtils.getWifiStrength(wifi);
-				wifiStrengthTextView.setText("Wifi Strength: " + m.wifiStrength);
+				ReactiveLocationProvider locationProvider = new ReactiveLocationProvider(m.getApplicationContext());
+				Subscription subscription = locationProvider.getUpdatedLocation(request)
+						.filter(new Func1<Location, Boolean>() {
+							@Override
+							public Boolean call(Location location) {
+								locationAccuracyTextView.setText("Location Accuracy: " + location.getAccuracy() + "m");
+								return location.getAccuracy() < 10.0f;
+							} // end call()
+						})
+						.first()
+						.subscribe(new Action1<Location>() {
+							@Override
+							public void call(Location location) {
+								WifiManager wifi = (WifiManager) m.getSystemService(Context.WIFI_SERVICE);
 
-				m.wifiSpeed = WifiUtils.getWifiLinkSpeed(wifi);
-				wifiSpeedTextView.setText("Wifi Speed: " + m. wifiSpeed);
+								m.wifiSSID = WifiUtils.getWifiSSID(wifi);
+								wifiSSIDTextView.setText("Wifi SSID: \"" + m.wifiSSID + "\"");
 
-				m.createLocationRequest();
-				m.getLastKnownLocation();
+								m.wifiStrength = WifiUtils.getWifiStrength(wifi);
+								wifiStrengthTextView.setText("Wifi Strength: " + m.wifiStrength);
 
-				updateUI();
-				// Write the collected data to JSON file on SD card
-				//writeDataToSDCard();
+								m.wifiSpeed = WifiUtils.getWifiLinkSpeed(wifi);
+								wifiSpeedTextView.setText("Wifi Speed: " + m.wifiSpeed);
+
+								latitudeTextView.setText(String.valueOf("Latitude: " + location.getLatitude()));
+								longitudeTextView.setText(String.valueOf("Longitude: " + location.getLongitude()));
+								locationAccuracyTextView.setText("Location Accuracy: " + location.getAccuracy() + "m");
+								lastUpdateTimeTextView.setText("Last Update Time: " + DateFormat.getTimeInstance().format(new Date()));
+							} // end call
+						});
+
 			} // end onClick()
 		});
 	} // end assignUIElements()
