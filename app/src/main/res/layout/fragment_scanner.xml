@@ -8,17 +8,8 @@
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Start periodic location updates"
-        android:id="@+id/buttonLocationUpdates"
-        android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true"/>
-
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
         android:text="Get data point"
         android:id="@+id/buttonGetData"
-        android:layout_below="@+id/buttonLocationUpdates"
         android:layout_centerHorizontal="true"/>
 
     <TextView
@@ -102,5 +93,12 @@
         android:layout_below="@+id/buttonTimerToggle"
         android:layout_centerHorizontal="true"
         android:hint="Enter a time interval..."/>
+
+    <NumberPicker
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/numberPicker"
+        android:layout_below="@+id/editTextInterval"
+        android:layout_centerHorizontal="true"/>
 
 </RelativeLayout>

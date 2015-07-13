@@ -56,6 +56,7 @@ class WifiBroadcastReceiver extends BroadcastReceiver {
 				fingerprint.setLongitude(m.mCurrentLocation.getLongitude());
 				fingerprint.setAltitude(m.mCurrentLocation.getAltitude());
 				fingerprint.setAccuracy(m.mCurrentLocation.getAccuracy());
+				fingerprint.setFloor(m.currentFloor);
 				fingerprint.setTimestamp(m.mLastUpdateTime);
 
 				ArrayList<WifiFingerprint> detectedWifis = new ArrayList<>();

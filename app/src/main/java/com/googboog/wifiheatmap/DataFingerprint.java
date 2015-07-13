@@ -8,6 +8,7 @@ public class DataFingerprint {
 	private double longitude;
 	private double altitude;
 	private float accuracy;
+	private String floor;
 	private String timestamp;
 	private ArrayList<WifiFingerprint> detectedWifis = new ArrayList<>();
 
@@ -25,6 +26,9 @@ public class DataFingerprint {
 	public void setAccuracy(float a) {
 		accuracy = a;
 	}
+	public void setFloor(String f) {
+		floor = f;
+	}
 	public void setTimestamp(String t) {
 		timestamp = t;
 	}
@@ -34,7 +38,6 @@ public class DataFingerprint {
 	public double getLatitude() {
 		return latitude;
 	}
-
 	public double getLongitude() {
 		return longitude;
 	}
@@ -43,6 +46,9 @@ public class DataFingerprint {
 	}
 	public float getAccuracy() {
 		return accuracy;
+	}
+	public String getFloor() {
+		return floor;
 	}
 	public String getTimestamp() {
 		return timestamp;

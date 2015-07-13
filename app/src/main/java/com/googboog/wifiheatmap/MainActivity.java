@@ -14,6 +14,7 @@ import android.location.LocationManager;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.widget.Toolbar;
@@ -30,9 +31,10 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.CameraPosition;
-import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.TileOverlay;
+import com.google.android.gms.maps.model.TileOverlayOptions;
 import com.google.maps.android.heatmaps.WeightedLatLng;
 
 import java.io.File;
@@ -75,6 +77,8 @@ public class MainActivity
 	int wifiStrength;
 	String wifiSSID;
 	String wifiSpeed;
+
+	String currentFloor;
 
 	// Timer stuff
 	private boolean timerRunning = false;
@@ -206,6 +210,10 @@ public class MainActivity
 	public void addHeatmap() {
 		//ArrayList<WeightedLatLng> wifiData = getWeightedLatLngList();
 
+
+		ArrayList<com.googboog.wifiheatmap.WeightedLatLng> list = new ArrayList<>();
+
+
 		// For all collected data fingerprints
 		for (DataFingerprint dataFingerprint : getDataFingerprints()) {
 
@@ -222,26 +230,36 @@ public class MainActivity
 			// For all detected wifis at the data fingerprint
 			for (WifiFingerprint wifi : wifis) {
 
-				if (wifi.getSSID().equals("UMD-Wireless")) {
-					Log.d(TAG, wifi.getBSSID() + ": " + wifi.getLevel());
+				if (wifi.getSSID().equals("ToTheMoon")) {
+					//Log.d(TAG, wifi.getBSSID() + ": " + wifi.getLevel());
 
-					float normalizedLevel = getNormalizedWiFiLevel(wifi.getLevel()) ;
+					float normalizedLevel = getNormalizedWiFiLevel(wifi.getLevel());
 					int colorIntensity = generateColorIntensity(normalizedLevel);
+
+
+					com.googboog.wifiheatmap.WeightedLatLng latLng = new com.googboog.wifiheatmap.WeightedLatLng(new LatLng(
+							dataFingerprint.getLatitude(),
+							dataFingerprint.getLongitude()),
+							normalizedLevel);
+					list.add(latLng);
 
 					// Instantiates a new CircleOptions object and defines the center and radius
 					CircleOptions circleOptions = new CircleOptions()
 							.center(new LatLng(dataFingerprint.getLatitude(), dataFingerprint.getLongitude()))
 							.radius(2) // In meters
-							.fillColor(colorIntensity)
-							.strokeColor(Color.TRANSPARENT); // Don't show the border to the circle
+							.fillColor(colorIntensity).strokeColor(Color.TRANSPARENT); // Don't show the border to the circle
 					// Get back the mutable Circle
-					Circle circle = mGoogleMap.addCircle(circleOptions);
+					//Circle circle = mGoogleMap.addCircle(circleOptions);
 
 					break;
 				} // end if
 			} // end for
 		} // end for
 
+
+		HeatmapTile tile = new HeatmapTile.Builder().radius(40).weightedData(list).build();
+
+		TileOverlay mOverlay = mGoogleMap.addTileOverlay(new TileOverlayOptions().tileProvider(tile));
 
 
 		/*
@@ -251,6 +269,11 @@ public class MainActivity
 		TileOverlay mOverlay = mGoogleMap.addTileOverlay(new TileOverlayOptions().tileProvider(mProvider));
 		*/
 	} // end addHeatMap()
+
+
+	public void generateHeatmap() {
+
+	} // end generateHeatmap()
 
 	public int generateColorIntensity(float intensity) {
 		int color1 = Color.rgb(102, 225, 0);
@@ -443,7 +466,20 @@ public class MainActivity
 	} // end onOptionsItemSelected()
 
 	public void showToast(String message) {
-		Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
+		// Create the toast
+		final Toast toast = Toast.makeText(getApplicationContext(), message, Toast.LENGTH_SHORT);
+
+		// Show the toast
+		toast.show();
+
+		// Cancel the toast after a custom amount of time
+		Handler handler = new Handler();
+		handler.postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				toast.cancel();
+			} // end run
+		}, 500);
 	} // end showToast()
 
 	Subscription fingerprintCollectionSub;
@@ -465,15 +501,15 @@ public class MainActivity
 		fingerprintCollectionSub = locationProvider.getUpdatedLocation(request).filter(new Func1<Location, Boolean>() {
 			@Override
 			public Boolean call(Location location) {
-				return location.getAccuracy() < 10.0f;
+				return location.getAccuracy() < 20.0f;
 			} // end call()
 		}).subscribe(new Action1<Location>() {
 			@Override
 			public void call(Location location) {
-				mCurrentLocation = location;
-				mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-					} // end call
-				});
+					mCurrentLocation = location;
+					mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
+				} // end call
+			});
 	} // end startCollectingDataFingerprints()
 
 	public void stopCollectingDataFingerprints() {
@@ -520,7 +556,6 @@ public class MainActivity
 
 			// Create the new file object
 			File wiFile = new File(dir, dataPointName);
-
 
 			// Create the JSON file object mapper
 			ObjectMapper mapper = new ObjectMapper();

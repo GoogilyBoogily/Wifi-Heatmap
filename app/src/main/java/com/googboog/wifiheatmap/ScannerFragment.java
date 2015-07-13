@@ -7,15 +7,19 @@ import android.location.Location;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.NumberPicker;
 import android.widget.TextView;
 
 import com.google.android.gms.location.LocationRequest;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.text.DateFormat;
 import java.util.Date;
 
@@ -48,6 +52,8 @@ public class ScannerFragment extends Fragment {
 
 	private Button timerToggleButton;
 	private EditText intervalEditText;
+
+	private NumberPicker numberPicker;
 
 	private boolean currentlyScanning = false;
 
@@ -98,7 +104,7 @@ public class ScannerFragment extends Fragment {
 	} // end onDetach()
 
 	protected void assignUIElements(View view) {
-		startLocationUpdatesButton = (Button) view.findViewById(R.id.buttonLocationUpdates);
+		// Grab the UI elements
 		getDataPointButton = (Button) view.findViewById(R.id.buttonGetData);
 
 		wifiSSIDTextView = (TextView) view.findViewById(R.id.textViewWifiSSID);
@@ -112,6 +118,54 @@ public class ScannerFragment extends Fragment {
 
 		timerToggleButton = (Button) view.findViewById(R.id.buttonTimerToggle);
 		intervalEditText = (EditText) view.findViewById(R.id.editTextInterval);
+
+		numberPicker = (NumberPicker) view.findViewById(R.id.numberPicker);
+
+		numberPicker.setMinValue(1);
+		numberPicker.setMaxValue(100);
+		numberPicker.setWrapSelectorWheel(false);
+		numberPicker.setValue(50);
+		m.currentFloor = "G";
+		numberPicker.setFormatter(new NumberPicker.Formatter() {
+			@Override
+			public String format(int value) {
+				if (value < 50) {
+					return "B" + String.valueOf(-value + 50);
+				} else if (value == 50) {
+					return "G";
+				} else {
+					return String.valueOf(value - 50);
+				} // end if/else
+			} // end format()
+		}); // end setFormatter()
+
+		try {
+			Method method = numberPicker.getClass().getDeclaredMethod("changeValueByOne", boolean.class);
+			method.setAccessible(true);
+			method.invoke(numberPicker, true);
+		} catch (NoSuchMethodException e) {
+			e.printStackTrace();
+		} catch (IllegalArgumentException e) {
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
+		} catch (InvocationTargetException e) {
+			e.printStackTrace();
+		} // end try/catch
+		numberPicker.setOnValueChangedListener(new NumberPicker.OnValueChangeListener() {
+			@Override
+			public void onValueChange(NumberPicker picker, int oldVal, int newVal) {
+				if (newVal < 50) {
+					m.currentFloor = "B" + String.valueOf(-newVal + 50);
+				} else if(newVal == 50) {
+					m.currentFloor = "G";
+				} else {
+					m.currentFloor = String.valueOf(newVal - 50);
+				} // end if/else
+
+				Log.d("onValueChange", m.currentFloor);
+			} // end onValueChange
+		}); // end setOnValueChangedListener()
 
 		timerToggleButton.setOnClickListener(new View.OnClickListener() {
 			@Override
@@ -150,20 +204,6 @@ public class ScannerFragment extends Fragment {
 			} // end onClick()
 		});
 
-		// Toggling the periodic location updates
-		startLocationUpdatesButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				if (!m.mRequestingLocationUpdates) {
-					// Changing the button text
-					startLocationUpdatesButton.setText(getString(R.string.stop_location_updates_button));
-				} else {
-					// Changing the button text
-					startLocationUpdatesButton.setText(getString(R.string.start_location_updates_button));
-				} // end if/else
-			} // end onClick()
-		});
-
 		getDataPointButton.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				m.showToast("Waiting for location before grabbing data...");
@@ -179,7 +219,7 @@ public class ScannerFragment extends Fragment {
 							@Override
 							public Boolean call(Location location) {
 								locationAccuracyTextView.setText("Location Accuracy: " + location.getAccuracy() + "m");
-								return location.getAccuracy() < 10.0f;
+								return location.getAccuracy() < 20.0f;
 							} // end call()
 						})
 						.first()
