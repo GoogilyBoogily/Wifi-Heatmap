@@ -80,6 +80,8 @@ public class MainActivity
 
 	String currentFloor;
 
+	String SSIDFilter;
+
 	// Timer stuff
 	private boolean timerRunning = false;
 	private long timerInterval = 1000;
@@ -230,7 +232,7 @@ public class MainActivity
 			// For all detected wifis at the data fingerprint
 			for (WifiFingerprint wifi : wifis) {
 
-				if (wifi.getSSID().equals("ToTheMoon")) {
+				if (wifi.getSSID().equals(SSIDFilter)) {
 					//Log.d(TAG, wifi.getBSSID() + ": " + wifi.getLevel());
 
 					float normalizedLevel = getNormalizedWiFiLevel(wifi.getLevel());
@@ -256,10 +258,14 @@ public class MainActivity
 			} // end for
 		} // end for
 
+		if (!list.isEmpty()) {
+			HeatmapTile tile = new HeatmapTile.Builder().radius(40).weightedData(list).build();
 
-		HeatmapTile tile = new HeatmapTile.Builder().radius(40).weightedData(list).build();
+			TileOverlay mOverlay = mGoogleMap.addTileOverlay(new TileOverlayOptions().tileProvider(tile));
+		} else {
+			Log.d(TAG, "WiFi data points list is empty!");
+		} // end if/else
 
-		TileOverlay mOverlay = mGoogleMap.addTileOverlay(new TileOverlayOptions().tileProvider(tile));
 
 
 		/*
@@ -357,14 +363,12 @@ public class MainActivity
 				ArrayList<WifiFingerprint> detectedWifis = dataPoint.getDetectedWifis();
 
 				for (WifiFingerprint wifi : detectedWifis) {
-					if (wifi.getSSID().equals("UMD-Wireless")) {
-						// Create the weighted data point with the normalized WiFi level
-						double normalizedWifiLevel = getNormalizedWiFiLevel(wifi.getLevel());
-						WeightedLatLng weightedLatLng = new WeightedLatLng(latLng, normalizedWifiLevel);
+					// Create the weighted data point with the normalized WiFi level
+					double normalizedWifiLevel = getNormalizedWiFiLevel(wifi.getLevel());
+					WeightedLatLng weightedLatLng = new WeightedLatLng(latLng, normalizedWifiLevel);
 
-						// Add the generated weighted latlng to the list
-						data.add(weightedLatLng);
-					} // end if
+					// Add the generated weighted latlng to the list
+					data.add(weightedLatLng);
 				} // end for
 
 			} catch (Exception e) {

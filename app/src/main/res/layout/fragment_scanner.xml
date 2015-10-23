@@ -80,9 +80,8 @@
         android:layout_height="wrap_content"
         android:text="Start collecting data"
         android:id="@+id/buttonTimerToggle"
-        android:layout_below="@+id/textViewLastUpdateTime"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="32dp"/>
+        android:layout_above="@+id/editTextInterval"
+        android:layout_centerHorizontal="true"/>
 
     <EditText
         android:layout_width="wrap_content"
@@ -90,15 +89,24 @@
         android:inputType="time"
         android:ems="10"
         android:id="@+id/editTextInterval"
-        android:layout_below="@+id/buttonTimerToggle"
-        android:layout_centerHorizontal="true"
-        android:hint="Enter a time interval..."/>
+        android:hint="Enter a time interval..."
+        android:layout_above="@+id/numberPicker"
+        android:layout_centerHorizontal="true"/>
 
     <NumberPicker
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/numberPicker"
-        android:layout_below="@+id/editTextInterval"
+        android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"/>
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/editTextSSIDFilter"
+        android:hint="SSID Filter"
+        android:layout_centerVertical="true"
+        android:layout_alignEnd="@+id/editTextInterval"
+        android:layout_alignStart="@+id/editTextInterval"/>
 
 </RelativeLayout>

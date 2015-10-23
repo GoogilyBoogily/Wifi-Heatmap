@@ -55,6 +55,8 @@ public class ScannerFragment extends Fragment {
 
 	private NumberPicker numberPicker;
 
+	private EditText SSIDFilterEditText;
+
 	private boolean currentlyScanning = false;
 
 	public ScannerFragment() {
@@ -119,6 +121,16 @@ public class ScannerFragment extends Fragment {
 		timerToggleButton = (Button) view.findViewById(R.id.buttonTimerToggle);
 		intervalEditText = (EditText) view.findViewById(R.id.editTextInterval);
 
+		SSIDFilterEditText = (EditText) view.findViewById(R.id.editTextSSIDFilter);
+
+		SSIDFilterEditText.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+			public void onFocusChange(View v, boolean hasFocus) {
+				if (!hasFocus) {
+					m.SSIDFilter = SSIDFilterEditText.getText().toString();
+				} // end if
+			} // end onFocusChange()
+		}); // end setOnFocusChangeListener()
+
 		numberPicker = (NumberPicker) view.findViewById(R.id.numberPicker);
 
 		numberPicker.setMinValue(1);
@@ -157,7 +169,7 @@ public class ScannerFragment extends Fragment {
 			public void onValueChange(NumberPicker picker, int oldVal, int newVal) {
 				if (newVal < 50) {
 					m.currentFloor = "B" + String.valueOf(-newVal + 50);
-				} else if(newVal == 50) {
+				} else if (newVal == 50) {
 					m.currentFloor = "G";
 				} else {
 					m.currentFloor = String.valueOf(newVal - 50);
@@ -246,6 +258,7 @@ public class ScannerFragment extends Fragment {
 
 			} // end onClick()
 		});
+
 	} // end assignUIElements()
 
 	protected void updateUI() {
